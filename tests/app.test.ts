@@ -37,7 +37,7 @@ describe('workshop registration and notifications', () => {
   function worker(): OutboxWorker {
     return new OutboxWorker(db, {
       notifierUrl: `http://127.0.0.1:${(mock.server.address() as { port: number }).port}`,
-      concurrency: 2, timeoutMs: 50, maxAttempts: 3, pollIntervalMs: 10, backoffBaseMs: 1,
+      concurrency: 2, timeoutMs: 50, maxAttempts: 3, pollIntervalMs: 10, backoffBaseMs: 1, backoffMaxMs: 10, leaseMs: 100,
       random: () => 0
     });
   }
@@ -58,6 +58,18 @@ describe('workshop registration and notifications', () => {
     const response = await app.inject({ method: 'POST', url: `/workshops/${id}/register`, payload: { memberId: 'm2', email: 'two@example.com' } });
     expect(response.statusCode).toBe(409);
     expect(db.listNotifications()).toHaveLength(1);
+  });
+
+  it('rolls back registration and outbox together when outbox insertion fails', async () => {
+    const id = await createWorkshop();
+    db.sqlite.exec(`
+      CREATE TRIGGER fail_confirmation BEFORE INSERT ON outbox
+      WHEN NEW.type = 'CONFIRMATION'
+      BEGIN SELECT RAISE(ABORT, 'simulated outbox failure'); END;
+    `);
+    expect(() => db.register(id, 'rollback', 'rollback@example.com')).toThrow('simulated outbox failure');
+    expect(db.listRegistrations(id)).toHaveLength(0);
+    expect(db.listNotifications()).toHaveLength(0);
   });
 
   it('retries after notifier failure without blocking another recipient', async () => {
@@ -83,6 +95,9 @@ describe('workshop registration and notifications', () => {
     const response = await app.inject({ method: 'POST', url: `/workshops/${id}/cancel`, headers: { 'x-api-key': 'test-key' } });
     expect(response.statusCode).toBe(200);
     expect(db.listNotifications('PENDING')).toHaveLength(6);
+    const second = await app.inject({ method: 'POST', url: `/workshops/${id}/cancel`, headers: { 'x-api-key': 'test-key' } });
+    expect(second.statusCode).toBe(409);
+    expect(db.listNotifications('PENDING')).toHaveLength(6);
   });
 
   it('recovers an expired lease with a new worker', async () => {
@@ -91,7 +106,8 @@ describe('workshop registration and notifications', () => {
     const claimed = db.claimDue(1, 1);
     expect(claimed).toHaveLength(1);
     db.sqlite.prepare("UPDATE outbox SET lockedUntil = '2000-01-01T00:00:00.000Z'").run();
-    await worker().processOnce();
+    const freshWorker = worker();
+    await freshWorker.processOnce();
     expect(db.listNotifications('SENT')).toHaveLength(1);
     expect(state.received).toHaveLength(1);
   });
@@ -105,5 +121,20 @@ describe('workshop registration and notifications', () => {
     await firstWorker.processOnce();
     expect(state.received).toHaveLength(1);
     expect(state.duplicateCount).toBe(1);
+  });
+
+  it('marks repeated failures DEAD and requeues them', async () => {
+    const id = await createWorkshop();
+    await app.inject({ method: 'POST', url: `/workshops/${id}/register`, payload: { memberId: 'dead', email: 'dead@example.com' } });
+    state.failRecipients?.add('dead@example.com');
+    const deadWorker = worker();
+    await deadWorker.processOnce();
+    await new Promise((resolve) => setTimeout(resolve, 3));
+    await deadWorker.processOnce();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await deadWorker.processOnce();
+    expect(db.listNotifications('DEAD')).toHaveLength(1);
+    expect(db.requeueDead()).toBe(1);
+    expect(db.listNotifications('PENDING')).toHaveLength(1);
   });
 });
