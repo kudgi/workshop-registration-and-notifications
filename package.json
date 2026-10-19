@@ -1,0 +1,32 @@
+{
+  "name": "workshop-registration-and-notifications",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "mock": "tsx src/mock-notifier/server.ts",
+    "test": "vitest run",
+    "demo": "tsx scripts/demo.ts",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/sensible": "^5.6.0",
+    "better-sqlite3": "^11.8.1",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.1",
+    "pino": "^9.6.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}
