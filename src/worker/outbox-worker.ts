@@ -8,6 +8,8 @@ export interface WorkerOptions {
   maxAttempts: number;
   pollIntervalMs: number;
   backoffBaseMs: number;
+  backoffMaxMs: number;
+  leaseMs: number;
   logger?: Pick<Console, 'error' | 'info'>;
   random?: () => number;
 }
@@ -41,7 +43,7 @@ export class OutboxWorker {
     if (this.cycleInProgress) return;
     this.cycleInProgress = true;
     try {
-      const rows = this.db.claimDue(this.options.concurrency, this.options.timeoutMs + 500);
+      const rows = this.db.claimDue(this.options.concurrency, this.options.leaseMs);
       await Promise.all(rows.map((row) => this.deliver(row)));
     } finally {
       this.cycleInProgress = false;
@@ -68,7 +70,7 @@ export class OutboxWorker {
       const attempts = row.attempts + 1;
       const dead = attempts >= this.options.maxAttempts;
       const jitter = Math.floor((this.options.random ?? Math.random)() * this.options.backoffBaseMs);
-      const delay = this.options.backoffBaseMs * 2 ** Math.max(0, attempts - 1) + jitter;
+      const delay = Math.min(this.options.backoffMaxMs, this.options.backoffBaseMs * 2 ** Math.max(0, attempts - 1) + jitter);
       this.db.markFailure(row.id, error instanceof Error ? error.message : String(error), new Date(Date.now() + delay).toISOString(), dead);
       this.options.logger?.error(`Notification ${row.id} failed: ${error instanceof Error ? error.message : String(error)}`);
     }

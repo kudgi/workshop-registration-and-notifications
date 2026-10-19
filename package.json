@@ -8,11 +8,11 @@
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
-    "mock": "tsx src/mock-notifier/server.ts",
+    "start": "node dist/server.js",
+    "mock": "node dist/mock-notifier/server.js",
     "test": "vitest run",
     "demo": "tsx scripts/demo.ts",
-    "build": "tsc --noEmit"
+    "build": "tsc"
   },
   "dependencies": {
     "@fastify/sensible": "^6.0.7",
