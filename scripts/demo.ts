@@ -70,7 +70,7 @@ try {
   await wait(1000);
   await request(`${mock}/received`);
   console.log('Cancel workshop and show cancellation notifications');
-  await request(`${api}/workshops/${workshop.id}/cancel`, { method: 'POST', headers });
+  await request(`${api}/workshops/${workshop.id}/cancel`, { method: 'POST', headers: { 'x-api-key': key } });
   await wait(500);
   await request(`${mock}/received`);
 } finally {
