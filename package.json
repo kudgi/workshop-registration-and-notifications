@@ -15,8 +15,8 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
-    "@fastify/sensible": "^5.6.0",
-    "better-sqlite3": "^11.8.1",
+    "@fastify/sensible": "^6.0.7",
+    "better-sqlite3": "^12.4.1",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.1",
     "pino": "^9.6.0",

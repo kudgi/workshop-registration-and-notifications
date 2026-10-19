@@ -23,7 +23,8 @@ export function createApp(db: AppDatabase, apiKey = 'change-me'): FastifyInstanc
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof z.ZodError) return reply.code(400).send({ error: 'Invalid request', details: error.issues });
     request.log.error(error);
-    return reply.code((error as { statusCode?: number }).statusCode ?? 500).send({ error: error.message });
+    const statusCode = (error as { statusCode?: number }).statusCode ?? 500;
+    return reply.code(statusCode).send({ error: error instanceof Error ? error.message : String(error) });
   });
 
   app.post('/workshops', async (request, reply) => {

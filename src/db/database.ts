@@ -5,6 +5,8 @@ import { randomUUID } from 'node:crypto';
 
 import type { Notification, NotificationStatus, Registration, Workshop } from '../types.js';
 
+type WorkshopRow = Omit<Workshop, 'cancelled'> & { cancelled: number };
+
 export class AppDatabase {
   readonly sqlite: Database.Database;
 
@@ -63,7 +65,7 @@ export class AppDatabase {
   }
 
   getWorkshop(id: string): Workshop | undefined {
-    const row = this.sqlite.prepare('SELECT * FROM workshops WHERE id = ?').get(id) as (Workshop & { cancelled: number }) | undefined;
+    const row = this.sqlite.prepare('SELECT * FROM workshops WHERE id = ?').get(id) as WorkshopRow | undefined;
     return row ? { ...row, cancelled: Boolean(row.cancelled) } : undefined;
   }
 
@@ -74,7 +76,7 @@ export class AppDatabase {
   register(workshopId: string, memberId: string, email: string): Registration {
     const now = new Date().toISOString();
     const transaction = this.sqlite.transaction(() => {
-      const workshop = this.sqlite.prepare('SELECT * FROM workshops WHERE id = ?').get(workshopId) as (Workshop & { cancelled: number }) | undefined;
+      const workshop = this.sqlite.prepare('SELECT * FROM workshops WHERE id = ?').get(workshopId) as WorkshopRow | undefined;
       if (!workshop) throw new Error('WORKSHOP_NOT_FOUND');
       if (workshop.cancelled) throw new Error('WORKSHOP_CANCELLED');
       const count = this.sqlite.prepare('SELECT COUNT(*) AS count FROM registrations WHERE workshopId = ?').get(workshopId) as { count: number };
@@ -98,7 +100,7 @@ export class AppDatabase {
   cancelWorkshop(workshopId: string): number {
     const now = new Date().toISOString();
     const transaction = this.sqlite.transaction(() => {
-      const workshop = this.sqlite.prepare('SELECT * FROM workshops WHERE id = ?').get(workshopId) as (Workshop & { cancelled: number }) | undefined;
+      const workshop = this.sqlite.prepare('SELECT * FROM workshops WHERE id = ?').get(workshopId) as WorkshopRow | undefined;
       if (!workshop) throw new Error('WORKSHOP_NOT_FOUND');
       if (workshop.cancelled) throw new Error('WORKSHOP_ALREADY_CANCELLED');
       this.sqlite.prepare('UPDATE workshops SET cancelled = 1 WHERE id = ?').run(workshopId);

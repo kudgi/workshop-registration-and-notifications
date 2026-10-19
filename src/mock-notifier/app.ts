@@ -29,7 +29,8 @@ export function createMockNotifierApp(state: MockNotifierState): FastifyInstance
     if (state.delayMs) await pause(state.delayMs);
     const body = request.body as { recipient: string; type: string; payload: unknown };
     if (state.failRecipients?.has(body.recipient) || Math.random() < state.errorRate) return reply.code(500).send({ error: 'random failure' });
-    const idempotencyKey = request.headers['idempotency-key'];
+    const idempotencyHeader = request.headers['idempotency-key'];
+    const idempotencyKey = Array.isArray(idempotencyHeader) ? idempotencyHeader[0] : idempotencyHeader;
     if (state.received.some((message) => message.idempotencyKey === idempotencyKey)) state.duplicateCount += 1;
     else state.received.push({ idempotencyKey, recipient: body.recipient, type: body.type, payload: body.payload });
     return reply.code(202).send({ accepted: true });
